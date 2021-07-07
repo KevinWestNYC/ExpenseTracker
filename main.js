@@ -1,6 +1,4 @@
 document.getElementById("form").addEventListener('submit', addExpense);
-document.getElementById("form").addEventListener('submit', resetForm);
-document.getElementById("table").addEventListener('click', removeExpense);
 const dateInput = document.getElementById("date");
 const locationInput = document.getElementById("location");
 const amountInput = document.getElementById("amount");
@@ -12,21 +10,33 @@ function addExpense(e){
     e.preventDefault();
 
     const newExpense = {
+        id: Date.now(),
         amount: amountInput.value,
-        date: dateInput.value,
+        date: formatDate(dateInput.value),
         location: locationInput.value,
         description: descriptionInput.value,
         category: categoryInput.value
     };
 
+    const expenseArray = getExpenses();
     renderExpenseRow(newExpense);
+    expenseArray.push(newExpense);
+    pushToLocalStorage(expenseArray);
+    updateTotal();
+    document.getElementById("form").reset();
+}
+
+function pushToLocalStorage(array){
+    localStorage.setItem('expenseArray', JSON.stringify(array));
+}
+
+function getExpenses() {
+    return(expenseArray =
+        JSON.parse(localStorage.getItem('expenseArray')) || [])
 }
 
 function renderExpenseRow(expense) {
-   
-    const deleteButton = document.createElement('button');
-    deleteButton.setAttribute("class", "delete-button");
-    deleteButton.innerHTML = "X"
+    const deleteButton = createDeleteButton(expense);
     
     const row = document.getElementById("table-body").insertRow(0);
     row.className = 'table-row';
@@ -36,8 +46,6 @@ function renderExpenseRow(expense) {
     const cell4 = row.insertCell(3);
     const cell5 = row.insertCell(4);
     const cell6 = row.insertCell(5);
-
-    updateTotal(expense.amount);
     
     cell1.textContent = expense.date;
     cell2.textContent = expense.location;
@@ -47,26 +55,56 @@ function renderExpenseRow(expense) {
     cell6.appendChild(deleteButton);
 }
 
-function removeExpense(e){
-    e.preventDefault();
+function createDeleteButton(expense){
+    const expenseArray = getExpenses();
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = 'X';
+    deleteButton.classList.add('DeleteButton');
+    deleteButton.addEventListener('click', () => {
+        removeExpense(deleteButton, expense.id)
+    });
+    return deleteButton;
+}
 
-    if(e.target.classList.contains('delete-button')){
-    const expenseToRemove = e.target.parentNode.parentNode;
-    let amountToRemove = parseFloat(expenseToRemove.childNodes[3].textContent.split('').filter((x) => x ==="$"? '': x).join(''));
-
-    updateTotal(-Math.abs(amountToRemove))
-    
-    expenseToRemove.remove();   
-
+function removeExpense(deleteButton, id){
+  const expenseArray = getExpenses();
+  deleteButton.parentElement.parentElement.remove();
+  for (let i = 0; i < expenseArray.length; i++) {
+    if(expenseArray[i].id === id){
+        expenseArray.splice(i, 1);
+        updateTotal();
+        pushToLocalStorage(expenseArray);
+        if(expenseArray.length === 0){
+            document.getElementById("total-number").textContent = '0';
+        }
     }
+  }
+  updateTotal()
 }
 
-function resetForm() {
-    document.getElementById("form").reset();
+
+function formatDate(dateInput){
+    let date = new Date(dateInput);
+    const options = {
+        dateStyle: 'full',
+        timeZone: 'UTC'
+    };
+    return new Intl.DateTimeFormat('en-US', options).format(date);
 }
 
-function updateTotal(amount) {
-    const currentTotal = parseFloat(document.getElementById("total-number").textContent);
-    const updatedTotal = (currentTotal + parseFloat(amount)).toFixed(2);
-    document.getElementById("total-number").textContent = `${updatedTotal}`;
+function updateTotal() {
+    let sum = 0;
+    const expenseArray = getExpenses();
+    expenseArray.forEach(({amount}) => {
+        sum += parseFloat(amount);
+        document.getElementById("total-number").textContent = sum;
+    });
 }
+
+window.addEventListener('load', () =>{
+    const expenseArray = getExpenses();
+    expenseArray.forEach((expense) => {
+        renderExpenseRow(expense);
+        updateTotal();
+    });
+});
